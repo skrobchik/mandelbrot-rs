@@ -10,7 +10,7 @@ use winit_input_helper::WinitInputHelper;
 use num_complex::Complex64;
 use rayon::prelude::*;
 
-const RESOLUTION: u32 = 400;
+const RESOLUTION: u32 = 800;
 
 struct MandelbrotSet {
     set: [u8; ((RESOLUTION*RESOLUTION) as usize)],
@@ -112,7 +112,6 @@ fn main() -> Result<(), Error> {
         }
 
         // Handle input events
-        
         if input.update(event) {
             // Close events
             if input.key_pressed(VirtualKeyCode::Escape) || input.quit() {
@@ -124,63 +123,64 @@ fn main() -> Result<(), Error> {
             //if let Some(size) = input.window_resized() {
             //    pixels.resize(size.width, size.height);
             //}
+            // https://github.com/parasyte/pixels/issues/121
             pixels.resize(window.inner_size().width, window.inner_size().height);
 
-            if input.key_pressed(VirtualKeyCode::Down) {
-                let im_range = mandelbrot.im_limits[1] - mandelbrot.im_limits[0];
-                mandelbrot.im_limits[0] += 0.1 * im_range;
-                mandelbrot.im_limits[1] += 0.1 * im_range;
-                mandelbrot.calculate();
-            }
-            if input.key_pressed(VirtualKeyCode::Up) {
-                let im_range = mandelbrot.im_limits[1] - mandelbrot.im_limits[0];
-                mandelbrot.im_limits[0] -= 0.1 * im_range;
-                mandelbrot.im_limits[1] -= 0.1 * im_range;
-                mandelbrot.calculate();
-            }
-            if input.key_pressed(VirtualKeyCode::Left) {
-                let re_range = mandelbrot.re_limits[1] - mandelbrot.re_limits[0];
-                mandelbrot.re_limits[0] -= 0.1 * re_range;
-                mandelbrot.re_limits[1] -= 0.1 * re_range;
-                mandelbrot.calculate();
-            }
-            if input.key_pressed(VirtualKeyCode::Right) {
-                let re_range = mandelbrot.re_limits[1] - mandelbrot.re_limits[0];
-                mandelbrot.re_limits[0] += 0.1 * re_range;
-                mandelbrot.re_limits[1] += 0.1 * re_range;
-                mandelbrot.calculate();
-            }
-            if input.key_pressed(VirtualKeyCode::X) {
-                let re_range = mandelbrot.re_limits[1] - mandelbrot.re_limits[0];
-                mandelbrot.re_limits[0] += 0.1 * re_range;
-                mandelbrot.re_limits[1] -= 0.1 * re_range;
-                let im_range = mandelbrot.im_limits[1] - mandelbrot.im_limits[0];
-                mandelbrot.im_limits[0] += 0.1 * im_range;
-                mandelbrot.im_limits[1] -= 0.1 * im_range;
-                mandelbrot.calculate();
-            }
-            if input.key_pressed(VirtualKeyCode::Z) {
-                let re_range = mandelbrot.re_limits[1] - mandelbrot.re_limits[0];
-                mandelbrot.re_limits[0] -= 0.1 * re_range;
-                mandelbrot.re_limits[1] += 0.1 * re_range;
-                let im_range = mandelbrot.im_limits[1] - mandelbrot.im_limits[0];
-                mandelbrot.im_limits[0] -= 0.1 * im_range;
-                mandelbrot.im_limits[1] += 0.1 * im_range;
-                mandelbrot.calculate();
-            }
-            if input.key_pressed(VirtualKeyCode::C) {
-                mandelbrot = MandelbrotSet::new();
-                mandelbrot.calculate();
-            }
-            if input.key_pressed(VirtualKeyCode::Add) {
-                mandelbrot.max_iterations += 10;
-                mandelbrot.calculate();
-            }
-            if input.key_pressed(VirtualKeyCode::Subtract) {
-                if mandelbrot.max_iterations > 10 {
-                    mandelbrot.max_iterations -= 10;
+            // Mandelbrot movement
+            {
+            let invert_vertical = true;
+            let up = input.key_pressed(VirtualKeyCode::Up);
+            let down = input.key_pressed(VirtualKeyCode::Down);
+            let left = input.key_pressed(VirtualKeyCode::Left);
+            let right = input.key_pressed(VirtualKeyCode::Right);
+            let zoom_in = input.key_pressed(VirtualKeyCode::X);
+            let zoom_out = input.key_pressed(VirtualKeyCode::Z);
+            let reset = input.key_pressed(VirtualKeyCode::C);
+            let less_iterations = input.key_pressed(VirtualKeyCode::Subtract);
+            let more_iterations = input.key_pressed(VirtualKeyCode::Add) || input.key_pressed(VirtualKeyCode::Equals);
+            
+            let im_range = mandelbrot.im_limits[1] - mandelbrot.im_limits[0];
+            let re_range = mandelbrot.re_limits[1] - mandelbrot.re_limits[0];
+            let shift = 0.1;
+            
+            if up || down || left || right {
+                let mut im_shift = 0.0;
+                let mut re_shift = 0.0;
+                if down { im_shift -= shift };
+                if up { im_shift += shift };
+                if left { re_shift -= shift };
+                if right { re_shift += shift };
+                if invert_vertical {
+                    im_shift *= -1.0;
                 }
+                mandelbrot.im_limits[0] += im_shift * im_range;
+                mandelbrot.im_limits[1] += im_shift * im_range;
+                mandelbrot.re_limits[0] += re_shift * re_range;
+                mandelbrot.re_limits[1] += re_shift * re_range;
+            }
+            if zoom_in || zoom_out {
+                let zoom_dir = {
+                    if zoom_in { 1.0 }
+                    else { -1.0 }
+                };
+                mandelbrot.re_limits[0] += zoom_dir * shift * re_range;
+                mandelbrot.re_limits[1] -= zoom_dir * shift * re_range;
+                mandelbrot.im_limits[0] += zoom_dir * shift * im_range;
+                mandelbrot.im_limits[1] -= zoom_dir * shift * im_range;
+            }
+            if reset {
+                mandelbrot = MandelbrotSet::new();
+            }
+            let iterations_delta = 10;
+            if more_iterations {
+                mandelbrot.max_iterations += iterations_delta;
+            }
+            if less_iterations && mandelbrot.max_iterations > iterations_delta {
+                mandelbrot.max_iterations -= 10;
+            }
+            if up || down || left || right || zoom_in || zoom_out || reset || less_iterations || more_iterations {
                 mandelbrot.calculate();
+            }
             }
 
             window.request_redraw();
