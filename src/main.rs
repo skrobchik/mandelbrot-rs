@@ -8,43 +8,53 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 use num_complex::Complex64;
+use rayon::prelude::*;
 
-const RESOLUTION: usize = 400;
+const RESOLUTION: u32 = 400;
 
 struct MandelbrotSet {
-    set: [u8; RESOLUTION*RESOLUTION],
+    set: [u8; ((RESOLUTION*RESOLUTION) as usize)],
     re_limits: [f64; 2],
     im_limits: [f64; 2],
+    max_iterations: u32,
 }
 
 impl MandelbrotSet {
-    pub fn mandelbrot(re: f64, im: f64) -> u8 {
-        const MAX_ITERATIONS: u8 = 255;
-        let mut n: u8 = 0;
+    pub fn normalize(iterations: u32, max_iterations: u32) -> u8 {
+        ((iterations as f32) / (max_iterations as f32) * 255.0).round() as u8
+    }
+    pub fn mandelbrot(re: f64, im: f64, max_iterations: u32) -> u32 {
+        let mut n = 0;
         let c = Complex64::new(re, im);
         let mut z = Complex64::new(0.0, 0.0);
-        while n < MAX_ITERATIONS && z.norm_sqr() < 4.0 {
+        while n <= max_iterations && z.norm_sqr() < 4.0 {
             z = z.powu(2) + c;
             n += 1;
         }
         n
     }
     pub fn calculate(self: &mut MandelbrotSet) {
-        for (i, c) in self.set.iter_mut().enumerate() {
-            let x = i % RESOLUTION;
-            let y = i / RESOLUTION;
-            let re_range = self.re_limits[1] - self.re_limits[0];
-            let im_range = self.im_limits[1] - self.im_limits[0];
-            let re = self.re_limits[0] + re_range/(RESOLUTION as f64) * (x as f64);
-            let im = self.im_limits[0] + im_range/(RESOLUTION as f64) * (y as f64);
-            *c = MandelbrotSet::mandelbrot(re, im);
-        }
+        let re_range = self.re_limits[1] - self.re_limits[0];
+        let im_range = self.im_limits[1] - self.im_limits[0];
+        let m_re = re_range / (RESOLUTION as f64);
+        let m_im = im_range / (RESOLUTION as f64);
+        let re0 = self.re_limits[0];
+        let im0 = self.im_limits[0];
+        let max_iterations = self.max_iterations;
+        self.set.par_iter_mut().enumerate().for_each(|(i, c)|{
+            let x = i % RESOLUTION as usize;
+            let y = i / RESOLUTION as usize;
+            let re = re0 + m_re * (x as f64);
+            let im = im0 + m_im * (y as f64);
+            *c = MandelbrotSet::normalize(MandelbrotSet::mandelbrot(re, im, max_iterations), max_iterations);
+        });
     }
     pub fn new() -> MandelbrotSet {
         MandelbrotSet {
-            set: [0; RESOLUTION*RESOLUTION],
+            set: [0; ((RESOLUTION*RESOLUTION) as usize)],
             re_limits: [-2.0, 2.0],
             im_limits: [-2.0, 2.0],
+            max_iterations: 255
         }
     }
     /// Asumes 4*RESOLUTION*RESOLUTION size
@@ -78,11 +88,17 @@ fn main() -> Result<(), Error> {
 
     let mut mandelbrot = MandelbrotSet::new();
     mandelbrot.calculate();
-
+    
+    let mut resize_count = 0;
     event_loop.run(move |event, _, control_flow| {
         // Draw the current frame
         if let Event::RedrawRequested(_) = event {
-            //world.draw(pixels.get_frame());
+            if resize_count > 0 {
+                let size = window.inner_size();
+                pixels.resize(size.width, size.height);
+                resize_count -= 1;
+            }
+
             mandelbrot.draw(pixels.get_frame());
             
             if pixels
@@ -96,6 +112,7 @@ fn main() -> Result<(), Error> {
         }
 
         // Handle input events
+        
         if input.update(event) {
             // Close events
             if input.key_pressed(VirtualKeyCode::Escape) || input.quit() {
@@ -104,9 +121,10 @@ fn main() -> Result<(), Error> {
             }
 
             // Resize the window
-            if let Some(size) = input.window_resized() {
-                pixels.resize(size.width, size.height);
-            }
+            //if let Some(size) = input.window_resized() {
+            //    pixels.resize(size.width, size.height);
+            //}
+            pixels.resize(window.inner_size().width, window.inner_size().height);
 
             if input.key_pressed(VirtualKeyCode::Down) {
                 let im_range = mandelbrot.im_limits[1] - mandelbrot.im_limits[0];
@@ -148,6 +166,20 @@ fn main() -> Result<(), Error> {
                 let im_range = mandelbrot.im_limits[1] - mandelbrot.im_limits[0];
                 mandelbrot.im_limits[0] -= 0.1 * im_range;
                 mandelbrot.im_limits[1] += 0.1 * im_range;
+                mandelbrot.calculate();
+            }
+            if input.key_pressed(VirtualKeyCode::C) {
+                mandelbrot = MandelbrotSet::new();
+                mandelbrot.calculate();
+            }
+            if input.key_pressed(VirtualKeyCode::Add) {
+                mandelbrot.max_iterations += 10;
+                mandelbrot.calculate();
+            }
+            if input.key_pressed(VirtualKeyCode::Subtract) {
+                if mandelbrot.max_iterations > 10 {
+                    mandelbrot.max_iterations -= 10;
+                }
                 mandelbrot.calculate();
             }
 
