@@ -12,11 +12,28 @@ use rayon::prelude::*;
 
 const RESOLUTION: u32 = 800;
 
+
 struct MandelbrotSet {
     set: [u8; ((RESOLUTION*RESOLUTION) as usize)],
     re_limits: [f64; 2],
     im_limits: [f64; 2],
     max_iterations: u32,
+    color_function: fn(u8) -> [u8; 3]
+}
+
+fn hsv_to_rgb(hsv: [u8; 3]) -> [u8; 3] {
+    let h: f32 = (hsv[0] as f32)/255.0 * 360.0;
+    let s: f32 = (hsv[1] as f32)/255.0;
+    let v: f32 = (hsv[2] as f32)/255.0;
+    let f = |n: f32|{
+        let u = n + h/60.0;
+        let k = u - (u / 6.0).floor() * 6.0;
+        v - v * s * k.min(4.0-k).min(1.0).max(0.0)
+    };
+    let r = 255.0 * f(5.0);
+    let g = 255.0 * f(3.0);
+    let b = 255.0 * f(1.0);
+    [r as u8, g as u8, b as u8]
 }
 
 impl MandelbrotSet {
@@ -33,7 +50,7 @@ impl MandelbrotSet {
         }
         n
     }
-    pub fn calculate(self: &mut MandelbrotSet) {
+    pub fn calculate(self: &mut Self) {
         let re_range = self.re_limits[1] - self.re_limits[0];
         let im_range = self.im_limits[1] - self.im_limits[0];
         let m_re = re_range / (RESOLUTION as f64);
@@ -49,19 +66,21 @@ impl MandelbrotSet {
             *c = MandelbrotSet::normalize(MandelbrotSet::mandelbrot(re, im, max_iterations), max_iterations);
         });
     }
-    pub fn new() -> MandelbrotSet {
-        MandelbrotSet {
+    pub fn new() -> Self {
+        Self {
             set: [0; ((RESOLUTION*RESOLUTION) as usize)],
             re_limits: [-2.0, 2.0],
             im_limits: [-2.0, 2.0],
-            max_iterations: 255
+            max_iterations: 255,
+            color_function: |c: u8| { [c, c, c] }
         }
     }
     /// Asumes 4*RESOLUTION*RESOLUTION size
     pub fn draw(self: &MandelbrotSet, frame: &mut [u8]) {
         for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
             let c = self.set[i];
-            pixel.copy_from_slice(&[c, c, c, 255]);
+            let rgb = (self.color_function)(c);
+            pixel.copy_from_slice(&[rgb[0], rgb[1], rgb[2], 255]);
         }
     }
 }
@@ -88,6 +107,9 @@ fn main() -> Result<(), Error> {
 
     let mut mandelbrot = MandelbrotSet::new();
     mandelbrot.calculate();
+    mandelbrot.color_function = |c| {
+        hsv_to_rgb([c, 255, 255])
+    };
     
     let mut resize_count = 0;
     event_loop.run(move |event, _, control_flow| {
