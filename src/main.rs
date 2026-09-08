@@ -1,37 +1,36 @@
 #![forbid(unsafe_code)]
 
-use std::sync::Arc;
 use log::error;
+use num_complex::Complex64;
 use pixels::{Pixels, SurfaceTexture};
+use rayon::prelude::*;
+use std::sync::Arc;
+use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::{DeviceEvent, DeviceId, StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
-use winit_input_helper::WinitInputHelper;
-use num_complex::Complex64;
-use rayon::prelude::*;
-use winit::application::ApplicationHandler;
 use winit::keyboard::KeyCode;
 use winit::window::{Window, WindowAttributes, WindowId};
+use winit_input_helper::WinitInputHelper;
 
 const RESOLUTION: u32 = 800;
 
-
 struct MandelbrotSet {
-    set: [u8; (RESOLUTION*RESOLUTION) as usize],
+    set: [u8; (RESOLUTION * RESOLUTION) as usize],
     re_limits: [f64; 2],
     im_limits: [f64; 2],
     max_iterations: u32,
-    color_function: fn(u8) -> [u8; 3]
+    color_function: fn(u8) -> [u8; 3],
 }
 
 fn hsv_to_rgb(hsv: [u8; 3]) -> [u8; 3] {
-    let h: f32 = (hsv[0] as f32)/255.0 * 360.0;
-    let s: f32 = (hsv[1] as f32)/255.0;
-    let v: f32 = (hsv[2] as f32)/255.0;
-    let f = |n: f32|{
-        let u = n + h/60.0;
+    let h: f32 = (hsv[0] as f32) / 255.0 * 360.0;
+    let s: f32 = (hsv[1] as f32) / 255.0;
+    let v: f32 = (hsv[2] as f32) / 255.0;
+    let f = |n: f32| {
+        let u = n + h / 60.0;
         let k = u - (u / 6.0).floor() * 6.0;
-        v - v * s * k.min(4.0-k).min(1.0).max(0.0)
+        v - v * s * k.min(4.0 - k).min(1.0).max(0.0)
     };
     let r = 255.0 * f(5.0);
     let g = 255.0 * f(3.0);
@@ -61,21 +60,24 @@ impl MandelbrotSet {
         let re0 = self.re_limits[0];
         let im0 = self.im_limits[0];
         let max_iterations = self.max_iterations;
-        self.set.par_iter_mut().enumerate().for_each(|(i, c)|{
+        self.set.par_iter_mut().enumerate().for_each(|(i, c)| {
             let x = i % RESOLUTION as usize;
             let y = i / RESOLUTION as usize;
             let re = re0 + m_re * (x as f64);
             let im = im0 + m_im * (y as f64);
-            *c = MandelbrotSet::normalize(MandelbrotSet::mandelbrot(re, im, max_iterations), max_iterations);
+            *c = MandelbrotSet::normalize(
+                MandelbrotSet::mandelbrot(re, im, max_iterations),
+                max_iterations,
+            );
         });
     }
     pub fn new() -> Self {
         Self {
-            set: [0; ((RESOLUTION*RESOLUTION) as usize)],
+            set: [0; ((RESOLUTION * RESOLUTION) as usize)],
             re_limits: [-2.0, 2.0],
             im_limits: [-2.0, 2.0],
             max_iterations: 255,
-            color_function: |c: u8| { [c, c, c] }
+            color_function: |c: u8| [c, c, c],
         }
     }
     /// Asumes 4*RESOLUTION*RESOLUTION size
@@ -101,34 +103,48 @@ struct App(Option<InitializedApp>);
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let size = LogicalSize::new(RESOLUTION as f64, RESOLUTION as f64);
-        let window = Arc::new(event_loop.create_window(WindowAttributes::default().with_title("Mandelbrot")
-            .with_inner_size(size)
-            .with_min_inner_size(size)).unwrap());
+        let window = Arc::new(
+            event_loop
+                .create_window(
+                    WindowAttributes::default()
+                        .with_title("Mandelbrot")
+                        .with_inner_size(size)
+                        .with_min_inner_size(size),
+                )
+                .unwrap(),
+        );
 
         let mut mandelbrot = MandelbrotSet::new();
         mandelbrot.calculate();
-        mandelbrot.color_function = |c| {
-            hsv_to_rgb([c, 255, 255])
-        };
+        mandelbrot.color_function = |c| hsv_to_rgb([c, 255, 255]);
 
         let pixels: Pixels<'static> = {
             let window_size = window.inner_size();
-            let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, window.clone());
+            let surface_texture =
+                SurfaceTexture::new(window_size.width, window_size.height, window.clone());
             Pixels::new(RESOLUTION as u32, RESOLUTION as u32, surface_texture).unwrap()
         };
 
         let input = WinitInputHelper::new();
 
-        std::mem::swap(self, &mut App(Some(InitializedApp {
-            resize_count: 0,
-            window,
-            pixels,
-            mandelbrot,
-            input,
-        })))
+        std::mem::swap(
+            self,
+            &mut App(Some(InitializedApp {
+                resize_count: 0,
+                window,
+                pixels,
+                mandelbrot,
+                input,
+            })),
+        )
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        _window_id: WindowId,
+        event: WindowEvent,
+    ) {
         let app = self.0.as_mut().unwrap();
 
         // Draw the current frame
@@ -141,7 +157,8 @@ impl ApplicationHandler for App {
 
             app.mandelbrot.draw(app.pixels.frame_mut());
 
-            if app.pixels
+            if app
+                .pixels
                 .render()
                 .map_err(|e| error!("pixels.render() failed: {}", e))
                 .is_err()
@@ -156,7 +173,6 @@ impl ApplicationHandler for App {
         let mandelbrot = &mut app.mandelbrot;
         // Handle input events
         if input.process_window_event(&event) {
-
             // Close events
             if input.key_pressed(KeyCode::Escape) || input.close_requested() {
                 event_loop.exit();
@@ -168,7 +184,12 @@ impl ApplicationHandler for App {
             //    pixels.resize(size.width, size.height);
             //}
             // https://github.com/parasyte/pixels/issues/121
-            pixels.resize_surface(app.window.inner_size().width, app.window.inner_size().height).unwrap();
+            pixels
+                .resize_surface(
+                    app.window.inner_size().width,
+                    app.window.inner_size().height,
+                )
+                .unwrap();
 
             // Mandelbrot movement
             {
@@ -190,10 +211,18 @@ impl ApplicationHandler for App {
                 if up || down || left || right {
                     let mut im_shift = 0.0;
                     let mut re_shift = 0.0;
-                    if down { im_shift -= shift };
-                    if up { im_shift += shift };
-                    if left { re_shift -= shift };
-                    if right { re_shift += shift };
+                    if down {
+                        im_shift -= shift
+                    };
+                    if up {
+                        im_shift += shift
+                    };
+                    if left {
+                        re_shift -= shift
+                    };
+                    if right {
+                        re_shift += shift
+                    };
                     if invert_vertical {
                         im_shift *= -1.0;
                     }
@@ -204,8 +233,11 @@ impl ApplicationHandler for App {
                 }
                 if zoom_in || zoom_out {
                     let zoom_dir = {
-                        if zoom_in { 1.0 }
-                        else { -1.0 }
+                        if zoom_in {
+                            1.0
+                        } else {
+                            -1.0
+                        }
                     };
                     mandelbrot.re_limits[0] += zoom_dir * shift * re_range;
                     mandelbrot.re_limits[1] -= zoom_dir * shift * re_range;
@@ -222,7 +254,16 @@ impl ApplicationHandler for App {
                 if less_iterations && mandelbrot.max_iterations > iterations_delta {
                     mandelbrot.max_iterations -= 10;
                 }
-                if up || down || left || right || zoom_in || zoom_out || reset || less_iterations || more_iterations {
+                if up
+                    || down
+                    || left
+                    || right
+                    || zoom_in
+                    || zoom_out
+                    || reset
+                    || less_iterations
+                    || more_iterations
+                {
                     mandelbrot.calculate();
                 }
             }
@@ -231,7 +272,12 @@ impl ApplicationHandler for App {
         }
     }
 
-    fn device_event(&mut self, _event_loop: &ActiveEventLoop, _device_id: DeviceId, event: DeviceEvent) {
+    fn device_event(
+        &mut self,
+        _event_loop: &ActiveEventLoop,
+        _device_id: DeviceId,
+        event: DeviceEvent,
+    ) {
         let app = self.0.as_mut().unwrap();
         app.input.process_device_event(&event);
     }
