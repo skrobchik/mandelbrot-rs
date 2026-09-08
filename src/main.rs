@@ -4,6 +4,7 @@ use log::error;
 use num_complex::Complex64;
 use pixels::{Pixels, SurfaceTexture};
 use rayon::prelude::*;
+use std::error::Error;
 use std::sync::Arc;
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
@@ -30,7 +31,7 @@ fn hsv_to_rgb(hsv: [u8; 3]) -> [u8; 3] {
     let f = |n: f32| {
         let u = n + h / 60.0;
         let k = u - (u / 6.0).floor() * 6.0;
-        v - v * s * k.min(4.0 - k).min(1.0).max(0.0)
+        v - v * s * k.min(4.0 - k).clamp(0.0, 1.0)
     };
     let r = 255.0 * f(5.0);
     let g = 255.0 * f(3.0);
@@ -52,7 +53,7 @@ impl MandelbrotSet {
         }
         n
     }
-    pub fn calculate(self: &mut Self) {
+    pub fn calculate(&mut self) {
         let re_range = self.re_limits[1] - self.re_limits[0];
         let im_range = self.im_limits[1] - self.im_limits[0];
         let m_re = re_range / (RESOLUTION as f64);
@@ -73,7 +74,7 @@ impl MandelbrotSet {
     }
     pub fn new() -> Self {
         Self {
-            set: [0; ((RESOLUTION * RESOLUTION) as usize)],
+            set: [0; (RESOLUTION * RESOLUTION) as usize],
             re_limits: [-2.0, 2.0],
             im_limits: [-2.0, 2.0],
             max_iterations: 255,
@@ -82,7 +83,7 @@ impl MandelbrotSet {
     }
     /// Asumes 4*RESOLUTION*RESOLUTION size
     pub fn draw(self: &MandelbrotSet, frame: &mut [u8]) {
-        for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
+        for (i, pixel) in frame.as_chunks_mut::<4>().0.iter_mut().enumerate() {
             let c = self.set[i];
             let rgb = (self.color_function)(c);
             pixel.copy_from_slice(&[rgb[0], rgb[1], rgb[2], 255]);
@@ -101,6 +102,12 @@ struct InitializedApp {
 struct App(Option<InitializedApp>);
 
 impl ApplicationHandler for App {
+    fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: StartCause) {
+        if let Some(app) = self.0.as_mut() {
+            app.input.step();
+        }
+    }
+
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let size = LogicalSize::new(RESOLUTION as f64, RESOLUTION as f64);
         let window = Arc::new(
@@ -122,21 +129,18 @@ impl ApplicationHandler for App {
             let window_size = window.inner_size();
             let surface_texture =
                 SurfaceTexture::new(window_size.width, window_size.height, window.clone());
-            Pixels::new(RESOLUTION as u32, RESOLUTION as u32, surface_texture).unwrap()
+            Pixels::new(RESOLUTION, RESOLUTION, surface_texture).unwrap()
         };
 
         let input = WinitInputHelper::new();
 
-        std::mem::swap(
-            self,
-            &mut App(Some(InitializedApp {
-                resize_count: 0,
-                window,
-                pixels,
-                mandelbrot,
-                input,
-            })),
-        )
+        *self = App(Some(InitializedApp {
+            resize_count: 0,
+            window,
+            pixels,
+            mandelbrot,
+            input,
+        }));
     }
 
     fn window_event(
@@ -245,7 +249,7 @@ impl ApplicationHandler for App {
                     mandelbrot.im_limits[1] -= zoom_dir * shift * im_range;
                 }
                 if reset {
-                    std::mem::swap(mandelbrot, &mut MandelbrotSet::new());
+                    *mandelbrot = MandelbrotSet::new();
                 }
                 let iterations_delta = 10;
                 if more_iterations {
@@ -282,19 +286,13 @@ impl ApplicationHandler for App {
         app.input.process_device_event(&event);
     }
 
-    fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: StartCause) {
-        if let Some(app) = self.0.as_mut() {
-            app.input.step();
-        }
-    }
-
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
         let app = self.0.as_mut().unwrap();
         app.input.end_step();
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
     let event_loop = EventLoop::new()?;
     let mut app = App(None);
