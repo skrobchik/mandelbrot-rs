@@ -4,8 +4,8 @@ use std::sync::Arc;
 use log::error;
 use pixels::{Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
-use winit::event::{DeviceEvent, DeviceId, Event, StartCause, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::event::{DeviceEvent, DeviceId, StartCause, WindowEvent};
+use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit_input_helper::WinitInputHelper;
 use num_complex::Complex64;
 use rayon::prelude::*;
@@ -17,7 +17,7 @@ const RESOLUTION: u32 = 800;
 
 
 struct MandelbrotSet {
-    set: [u8; ((RESOLUTION*RESOLUTION) as usize)],
+    set: [u8; (RESOLUTION*RESOLUTION) as usize],
     re_limits: [f64; 2],
     im_limits: [f64; 2],
     max_iterations: u32,
@@ -128,7 +128,7 @@ impl ApplicationHandler for App {
         })))
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
         let app = self.0.as_mut().unwrap();
 
         // Draw the current frame
@@ -231,18 +231,18 @@ impl ApplicationHandler for App {
         }
     }
 
-    fn device_event(&mut self, event_loop: &ActiveEventLoop, device_id: DeviceId, event: DeviceEvent) {
+    fn device_event(&mut self, _event_loop: &ActiveEventLoop, _device_id: DeviceId, event: DeviceEvent) {
         let app = self.0.as_mut().unwrap();
         app.input.process_device_event(&event);
     }
 
-    fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
+    fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: StartCause) {
         if let Some(app) = self.0.as_mut() {
             app.input.step();
         }
     }
 
-    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
         let app = self.0.as_mut().unwrap();
         app.input.end_step();
     }
