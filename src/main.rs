@@ -1,12 +1,12 @@
 #![forbid(unsafe_code)]
 
 mod app;
-mod mandelbrot;
 mod color_functions;
+mod mandelbrot;
 
+use app::App;
 use std::error::Error;
 use winit::event_loop::EventLoop;
-use app::App;
 
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();

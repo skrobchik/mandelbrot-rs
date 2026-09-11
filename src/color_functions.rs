@@ -22,5 +22,9 @@ pub fn rainbow(normalized_iterations: u8) -> [u8; 3] {
 
 #[allow(dead_code)]
 pub fn grayscale(normalized_iterations: u8) -> [u8; 3] {
-    [normalized_iterations, normalized_iterations, normalized_iterations]
+    [
+        normalized_iterations,
+        normalized_iterations,
+        normalized_iterations,
+    ]
 }

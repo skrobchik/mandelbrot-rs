@@ -1,6 +1,6 @@
+use crate::color_functions::ColorFunction;
 use num_complex::Complex64;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
-use crate::color_functions::ColorFunction;
 
 pub struct MandelbrotSet {
     width: u32,
@@ -44,16 +44,19 @@ impl MandelbrotSet {
         let re0 = self.translation[0] - re_range / 2.0;
         let im0 = self.translation[1] - im_range / 2.0;
         let max_iterations = self.max_iterations;
-        self.output_buffer.par_iter_mut().enumerate().for_each(|(i, c)| {
-            let x = i % width as usize;
-            let y = i / height as usize;
-            let re = re0 + m_re * (x as f64);
-            let im = im0 + m_im * (y as f64);
-            *c = MandelbrotSet::normalize(
-                MandelbrotSet::mandelbrot(re, im, max_iterations),
-                max_iterations,
-            );
-        });
+        self.output_buffer
+            .par_iter_mut()
+            .enumerate()
+            .for_each(|(i, c)| {
+                let x = i % width as usize;
+                let y = i / height as usize;
+                let re = re0 + m_re * (x as f64);
+                let im = im0 + m_im * (y as f64);
+                *c = MandelbrotSet::normalize(
+                    MandelbrotSet::mandelbrot(re, im, max_iterations),
+                    max_iterations,
+                );
+            });
     }
     pub fn new(color_function: fn(u8) -> [u8; 3], width: u32, height: u32) -> Self {
         Self {

@@ -37,7 +37,12 @@ impl ApplicationHandler for App {
         let size = window.inner_size();
         let app = InitializedApp {
             window: window.clone(),
-            pixels: Pixels::new(size.width, size.height, SurfaceTexture::new(size.width, size.height, window)).unwrap(),
+            pixels: Pixels::new(
+                size.width,
+                size.height,
+                SurfaceTexture::new(size.width, size.height, window),
+            )
+            .unwrap(),
             mandelbrot: MandelbrotSet::new(rainbow, size.width, size.height),
             input: WinitInputHelper::new(),
         };
@@ -96,7 +101,8 @@ impl ApplicationHandler for App {
                 let more_iterations = input.key_pressed(KeyCode::Equal);
 
                 if up || down || left || right {
-                    let speed_pixels = (0.1 * (app.window.inner_size().height as f32)).ceil() as i32;
+                    let speed_pixels =
+                        (0.1 * (app.window.inner_size().height as f32)).ceil() as i32;
                     let mut translation_pixels: [i32; 2] = [0, 0];
                     if down {
                         translation_pixels[1] -= speed_pixels;
@@ -113,8 +119,10 @@ impl ApplicationHandler for App {
                     if invert_vertical {
                         translation_pixels[1] *= -1;
                     }
-                    mandelbrot.translation[0] += (translation_pixels[0] as f64) * mandelbrot.pixel_size;
-                    mandelbrot.translation[1] += (translation_pixels[1] as f64) * mandelbrot.pixel_size;
+                    mandelbrot.translation[0] +=
+                        (translation_pixels[0] as f64) * mandelbrot.pixel_size;
+                    mandelbrot.translation[1] +=
+                        (translation_pixels[1] as f64) * mandelbrot.pixel_size;
                 }
                 let zoom_speed = 0.1;
                 if zoom_in {
