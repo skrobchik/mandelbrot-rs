@@ -1,10 +1,9 @@
 use crate::color_functions::rainbow;
 use crate::mandelbrot::MandelbrotSet;
-use log::{error, info};
+use log::error;
 use pixels::{Pixels, SurfaceTexture};
 use std::sync::Arc;
 use winit::application::ApplicationHandler;
-use winit::dpi::PhysicalSize;
 use winit::event::{DeviceEvent, DeviceId, StartCause, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::KeyCode;
