@@ -1,7 +1,6 @@
 use crate::color_functions::ColorFunction;
 use num_complex::Complex64;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
-use std::sync::Arc;
 
 
 pub struct MandelbrotSet {

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["app", "shaders"]
+members = ["app", "krnl_add_vectors"]
 
 [workspace.dependencies]
 env_logger = "0.11"
@@ -10,8 +10,10 @@ winit = "0.30"
 winit_input_helper = "0.17"
 num-complex = "0.4"
 rayon = "1"
-spirv-std = "0.9"
-spirv-builder = "0.10.0-alpha.1"
+krnl = { path="../krnl" }
+krnl-core = { path="../krnl" }
+krnl-macros = { path="../krnl" }
+krnlc = { path="../krnl" }
 
 [profile.release.build-override]
 opt-level = 3

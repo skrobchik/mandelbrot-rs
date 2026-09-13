@@ -1,4 +1,3 @@
-#![feature(slice_as_chunks)]
 #![forbid(unsafe_code)]
 
 mod app;
