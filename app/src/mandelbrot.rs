@@ -1,18 +1,7 @@
-
-use cutile::prelude::PartitionOp;
-use cutile::cuda_core::Stream;
 use crate::color_functions::ColorFunction;
 use num_complex::Complex64;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
-
-use cuda_async::device_operation::DeviceOp;
-use cuda_core::Device;
 use std::sync::Arc;
-use cutile;
-use cutile::api::{ones, zeros, linspace};
-use cutile::error::Error;
-use cutile::tensor::{IntoPartition, Tensor, ToHostVec, Unpartition};
-use cutile::tile_kernel::TileKernel;
 
 
 pub struct MandelbrotSet {
@@ -27,37 +16,37 @@ pub struct MandelbrotSet {
     pub color_function: ColorFunction,
 }
 
-#[cutile::module]
-mod my_module {
-    use cutile::core::*;
-
-    #[cutile::entry()]
-    fn mandelbrot<const S: [i32; 2]>(
-        s: &mut Tensor<u32, S>,  // Output: number of iterations
-        c_re: &Tensor<f32, {[-1, -1]}>,
-        c_im: &Tensor<f32, {[-1, -1]}>,
-        max_iterations: u32,
-    ) {
-        let mut n = 0.broadcast(s.shape());
-
-        let c_re = c_re.load_like(s);
-        let c_im = c_im.load_like(s);
-        let mut z_re = c_re;
-        let mut z_im = c_im;
-
-        for _ in 0..max_iterations {
-            let norm_sqr = z_re * z_re + z_im * z_im;
-            let reached = norm_sqr.lt_tile((4.0).broadcast(norm_sqr.shape()));
-
-            let new_z_re = z_re * z_re - z_im * z_im + c_re;
-            let new_z_im = (2.0).broadcast(z_im.shape()) * z_re * z_im + c_im;
-            z_re = select(reached, z_re, new_z_re);
-            z_im = select(reached, z_im, new_z_im);
-            n = select(reached, n, 1.broadcast(n.shape()) + n);
-        }
-        s.store(n);
-    }
-}
+// #[cutile::module]
+// mod my_module {
+//     use cutile::core::*;
+//
+//     #[cutile::entry()]
+//     fn mandelbrot<const S: [i32; 2]>(
+//         s: &mut Tensor<u32, S>,  // Output: number of iterations
+//         c_re: &Tensor<f32, {[-1, -1]}>,
+//         c_im: &Tensor<f32, {[-1, -1]}>,
+//         max_iterations: u32,
+//     ) {
+//         let mut n = 0.broadcast(s.shape());
+//
+//         let c_re = c_re.load_like(s);
+//         let c_im = c_im.load_like(s);
+//         let mut z_re = c_re;
+//         let mut z_im = c_im;
+//
+//         for _ in 0..max_iterations {
+//             let norm_sqr = z_re * z_re + z_im * z_im;
+//             let reached = norm_sqr.lt_tile((4.0).broadcast(norm_sqr.shape()));
+//
+//             let new_z_re = z_re * z_re - z_im * z_im + c_re;
+//             let new_z_im = (2.0).broadcast(z_im.shape()) * z_re * z_im + c_im;
+//             z_re = select(reached, z_re, new_z_re);
+//             z_im = select(reached, z_im, new_z_im);
+//             n = select(reached, n, 1.broadcast(n.shape()) + n);
+//         }
+//         s.store(n);
+//     }
+// }
 
 impl MandelbrotSet {
     pub fn resize(&mut self, width: u32, height: u32) {
@@ -80,22 +69,22 @@ impl MandelbrotSet {
         n
     }
 
-    pub fn calculate_gpu(&mut self) {
-        let width = self.width;
-        let height = self.height;
-        let re_range = (width as f64) * self.pixel_size;
-        let im_range = (height as f64) * self.pixel_size;
-        let m_re = re_range / (width as f64);
-        let m_im = im_range / (height as f64);
-        let re0 = self.translation[0] - re_range / 2.0;
-        let im0 = self.translation[1] - im_range / 2.0;
-        let max_iterations = self.max_iterations;
-
-        let out = zeros::<u32>(&[width as usize, height as usize]).partition([4, 4]);
-        let c_re = linspace(re0 as f32, re0 as f32 + re_range as f32, width as usize);
-        let c_im = linspace(im0 as f32, im0 as f32 + im_range as f32, height as usize);
-        my_module::mandelbrot(out, c_re, c_im, max_iterations).sync().unwrap();
-    }
+    // pub fn calculate_gpu(&mut self) {
+    //     let width = self.width;
+    //     let height = self.height;
+    //     let re_range = (width as f64) * self.pixel_size;
+    //     let im_range = (height as f64) * self.pixel_size;
+    //     let m_re = re_range / (width as f64);
+    //     let m_im = im_range / (height as f64);
+    //     let re0 = self.translation[0] - re_range / 2.0;
+    //     let im0 = self.translation[1] - im_range / 2.0;
+    //     let max_iterations = self.max_iterations;
+    //
+    //     let out = zeros::<u32>(&[width as usize, height as usize]).partition([4, 4]);
+    //     let c_re = linspace(re0 as f32, re0 as f32 + re_range as f32, width as usize);
+    //     let c_im = linspace(im0 as f32, im0 as f32 + im_range as f32, height as usize);
+    //     my_module::mandelbrot(out, c_re, c_im, max_iterations).sync().unwrap();
+    // }
 
     #[allow(dead_code)]
     pub fn calculate_cpu(&mut self) {

@@ -66,7 +66,7 @@ impl ApplicationHandler for App {
         }
 
         if let WindowEvent::RedrawRequested = event {
-            mandelbrot.calculate_gpu();
+            mandelbrot.calculate_cpu();
             mandelbrot.draw(pixels.frame_mut());
             if pixels
                 .render()
