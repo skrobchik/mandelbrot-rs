@@ -11,25 +11,9 @@ mod kernels {
     use krnl::krnl_core;
     use krnl_core::macros::kernel;
 
-    pub fn saxpy_impl(alpha: f32, x: f32, y: &mut f32) {
+    #[kernel]
+    pub fn saxpy(#[item] x: f32, alpha: f32, #[item] y: &mut f32) {
         *y += alpha * x;
-    }
-
-    // Item kernels for iterator patterns.
-    #[kernel]
-    pub fn saxpy(alpha: f32, #[item] x: f32, #[item] y: &mut f32) {
-        saxpy_impl(alpha, x, y);
-    }
-
-    // General purpose kernels like CUDA / OpenCL.
-    #[kernel]
-    pub fn saxpy_global(alpha: f32, #[global] x: Slice<f32>, #[global] y: UnsafeSlice<f32>) {
-        use krnl_core::buffer::UnsafeIndex;
-
-        let global_id = kernel.global_id();
-        if global_id < x.len().min(y.len()) {
-            saxpy_impl(alpha, x[global_id], unsafe { y.unsafe_index_mut(global_id) });
-        }
     }
 }
 
@@ -41,17 +25,9 @@ fn saxpy(alpha: f32, x: Slice<f32>, mut y: SliceMut<f32>) -> Result<()> {
             .for_each(|(x, y)| kernels::saxpy_impl(alpha, x, y));
         return Ok(());
     }
-    if true {
-        kernels::saxpy::builder()?
-            .build(y.device())?
-            .dispatch(alpha, x, y)
-    } else {
-        // or
-        kernels::saxpy_global::builder()?
-            .build(y.device())?
-            .with_global_threads(y.len() as u32)
-            .dispatch(alpha, x, y)
-    }
+    kernels::saxpy::builder()?
+        .build(y.device())?
+        .dispatch(x, alpha, y)
 }
 
 fn main() -> Result<()> {

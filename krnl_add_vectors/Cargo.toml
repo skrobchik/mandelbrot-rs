@@ -1,7 +1,13 @@
 [package]
 name = "krnl_add_vectors"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 krnl = { workspace = true }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(target_arch, values("spirv"))',
+    'cfg(krnlc)',
+] }
