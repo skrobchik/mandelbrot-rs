@@ -6,6 +6,7 @@ use krnl::{
 };
 
 #[module]
+#[krnl(no_build)]
 mod kernels {
     #[cfg(not(target_arch = "spirv"))]
     use krnl::krnl_core;
@@ -18,13 +19,6 @@ mod kernels {
 }
 
 fn saxpy(alpha: f32, x: Slice<f32>, mut y: SliceMut<f32>) -> Result<()> {
-    if let Some((x, y)) = x.as_host_slice().zip(y.as_host_slice_mut()) {
-        x.iter()
-            .copied()
-            .zip(y.iter_mut())
-            .for_each(|(x, y)| kernels::saxpy_impl(alpha, x, y));
-        return Ok(());
-    }
     kernels::saxpy::builder()?
         .build(y.device())?
         .dispatch(x, alpha, y)
