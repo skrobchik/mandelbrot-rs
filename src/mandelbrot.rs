@@ -152,14 +152,7 @@ impl MandelbrotSet {
                     output_buffer.as_slice_mut(),
                 )
                 .unwrap();
-            for (dst, src) in self
-                .output_buffer
-                .as_mut_slice()
-                .iter_mut()
-                .zip(output_buffer.as_host_slice().unwrap())
-            {
-                *dst = *src;
-            }
+            std::mem::swap(&mut self.output_buffer, &mut output_buffer.into_vec().unwrap());
         } else {
             self.output_buffer
                 .par_iter_mut()

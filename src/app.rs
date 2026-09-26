@@ -9,12 +9,14 @@ use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::KeyCode;
 use winit::window::{Window, WindowAttributes, WindowId};
 use winit_input_helper::WinitInputHelper;
+use krnl::device::Device;
 
 pub struct InitializedApp {
     window: Arc<Window>,
     pixels: Pixels<'static>,
     mandelbrot: MandelbrotSet,
     input: WinitInputHelper,
+    gpu: Device,
 }
 
 pub struct App(pub Option<InitializedApp>);
@@ -44,6 +46,7 @@ impl ApplicationHandler for App {
             .unwrap(),
             mandelbrot: MandelbrotSet::new(rainbow, size.width, size.height),
             input: WinitInputHelper::new(),
+            gpu: Device::builder().build().unwrap(),
         };
         *self = App(Some(app));
     }
@@ -66,7 +69,7 @@ impl ApplicationHandler for App {
         }
 
         if let WindowEvent::RedrawRequested = event {
-            mandelbrot.calculate(None);
+            mandelbrot.calculate(Some(app.gpu.clone()));
             mandelbrot.draw(pixels.frame_mut());
             if pixels
                 .render()
