@@ -1,7 +1,7 @@
 use crate::color_functions::ColorFunction;
 use num_complex::Complex64;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
-
+use krnl::macros::module;
 
 pub struct MandelbrotSet {
     width: u32,
@@ -15,37 +15,63 @@ pub struct MandelbrotSet {
     pub color_function: ColorFunction,
 }
 
-// #[cutile::module]
-// mod my_module {
-//     use cutile::core::*;
-//
-//     #[cutile::entry()]
-//     fn mandelbrot<const S: [i32; 2]>(
-//         s: &mut Tensor<u32, S>,  // Output: number of iterations
-//         c_re: &Tensor<f32, {[-1, -1]}>,
-//         c_im: &Tensor<f32, {[-1, -1]}>,
-//         max_iterations: u32,
-//     ) {
-//         let mut n = 0.broadcast(s.shape());
-//
-//         let c_re = c_re.load_like(s);
-//         let c_im = c_im.load_like(s);
-//         let mut z_re = c_re;
-//         let mut z_im = c_im;
-//
-//         for _ in 0..max_iterations {
-//             let norm_sqr = z_re * z_re + z_im * z_im;
-//             let reached = norm_sqr.lt_tile((4.0).broadcast(norm_sqr.shape()));
-//
-//             let new_z_re = z_re * z_re - z_im * z_im + c_re;
-//             let new_z_im = (2.0).broadcast(z_im.shape()) * z_re * z_im + c_im;
-//             z_re = select(reached, z_re, new_z_re);
-//             z_im = select(reached, z_im, new_z_im);
-//             n = select(reached, n, 1.broadcast(n.shape()) + n);
-//         }
-//         s.store(n);
-//     }
-// }
+#[module]
+mod kernels {
+    #[cfg(not(target_arch = "spirv"))]
+    use krnl::krnl_core;
+    use krnl_core::macros::kernel;
+    use core::ops::Add;
+
+    #[derive(Clone, Copy)]
+    pub struct Complex {
+        re: f64,
+        im: f64,
+    }
+    impl Complex {
+        pub fn new(re: f64, im: f64) -> Complex {
+            Complex {
+                re,
+                im,
+            }
+        }
+        pub fn norm_sqr(&self) -> f64 {
+            self.re * self.re + self.im * self.im
+        }
+        pub fn pow2(&self) -> Complex {
+            Complex {
+                re: self.re * self.re - self.im * self.im,
+                im: 2.0 * self.re * self.im,
+            }
+        }
+    }
+
+    impl Add for Complex {
+        type Output = Self;
+
+        fn add(self, rhs: Self) -> Self::Output {
+            Complex {
+                re: self.re + rhs.re,
+                im: self.im + rhs.im,
+            }
+        }
+    }
+
+    pub fn mandelbrot_impl(max_iterations: u32, re: f64, im: f64, iterations: &mut u32) {
+        let mut n = 0;
+        let c = Complex::new(re, im);
+        let mut z = Complex::new(0.0, 0.0);
+        while n <= max_iterations && z.norm_sqr() < 4.0 {
+            z = z.pow2() + c;
+            n += 1;
+        }
+        *iterations = n
+    }
+
+    #[kernel]
+    pub fn mandelbrot(max_iterations: u32, #[item] re: f64, #[item] im: f64, #[item] iterations: &mut u32) {
+        mandelbrot_impl(max_iterations, re, im, iterations);
+    }
+}
 
 impl MandelbrotSet {
     pub fn resize(&mut self, width: u32, height: u32) {
@@ -105,8 +131,10 @@ impl MandelbrotSet {
                 let y = i / height as usize;
                 let re = re0 + m_re * (x as f64);
                 let im = im0 + m_im * (y as f64);
+                let mut iterations = 0;
+                kernels::mandelbrot_impl(max_iterations, re, im, &mut iterations);
                 *c = MandelbrotSet::normalize(
-                    MandelbrotSet::mandelbrot(re, im, max_iterations),
+                    iterations,
                     max_iterations,
                 );
             });
