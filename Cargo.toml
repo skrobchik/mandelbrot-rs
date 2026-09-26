@@ -1,8 +1,13 @@
-[workspace]
-resolver = "2"
-members = ["app", "krnl_add_vectors"]
+[package]
+name = "mandelbrot-rs"
+version = "0.1.0"
+authors = ["Robert Serrano Kobylyansky <sk.robchik@gmail.com>"]
+edition = "2018"
+license = "MIT"
 
-[workspace.dependencies]
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
 env_logger = "0.11"
 log = "0.4"
 pixels = "0.15"
@@ -10,14 +15,3 @@ winit = "0.30"
 winit_input_helper = "0.17"
 num-complex = "0.4"
 rayon = "1"
-krnl = { path="../krnl" }
-krnl-core = { path="../krnl/krnl-core" }
-krnl-macros = { path="../krnl/krnl-macros" }
-krnlc = { path="../krnl/krnlc" }
-
-[profile.release.build-override]
-opt-level = 3
-codegen-units = 16
-
-[profile.dev.build-override]
-opt-level = 3
