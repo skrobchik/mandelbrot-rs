@@ -10,10 +10,9 @@ license = "MIT"
 [dependencies]
 env_logger = "0.11"
 log = "0.4"
-pixels = "0.15"
+pixels = "0.17.2"
 winit = "0.30"
 winit_input_helper = "0.17"
-num-complex = "0.4"
 rayon = "1"
 krnl = { git = "https://github.com/skrobchik/krnl.git", branch = "main" }
 
